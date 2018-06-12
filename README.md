@@ -1,6 +1,6 @@
 # AndroidSerialport 
 Android 串口通讯,基于android_serialport_api google开源的,简化代码
-项目中只使用到SerialPort类和3个so文件
+# 项目中只使用到SerialPort类和3个so文件
 public static SerialPort getSerialPort() throws SecurityException, IOException, InvalidParameterException {
         if (mSerialPort == null) {
             //串口文件和波特率
