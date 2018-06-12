@@ -8,8 +8,10 @@ import android.widget.Toast;
 
 import android_serialport_api.SerialPort;
 
-import com.port.serialport.thread.ReadThread;
+import com.port.serialport.factory.ThreadPoolProxyFactory;
+import com.port.serialport.thread.ReadSerialportThread;
 import com.port.serialport.thread.SendService;
+import com.port.serialport.utils.IoUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,8 +29,9 @@ public class SerialportApplication extends Application {
     private static Context mContext;
     private static InputStream mInputStream;
     private static OutputStream mOutputStream;
-    private static ReadThread mReadThread;
-    private static Intent mStartIntent;
+    private static ReadSerialportThread mReadThread;
+    private static Intent startIntent;
+
 
     public static InputStream getInputStream() {
         return mInputStream;
@@ -46,52 +49,29 @@ public class SerialportApplication extends Application {
         return mSerialPort;
     }
 
+
     /**
      * 关闭串口和服务
      */
     public static void closeSerialPort() {
-        if (mStartIntent != null) {
-            mContext.stopService(mStartIntent);
-        }
         if (mSerialPort != null) {
             mSerialPort.close();
             mSerialPort = null;
         }
-
         if (null != mInputStream) {
-            try {
-                mInputStream.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                if (null != mInputStream) {
-                    try {
-                        mInputStream.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
+            IoUtils.closeFileStream(mInputStream);
             mInputStream = null;
         }
         if (null != mOutputStream) {
-            try {
-                mOutputStream.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            if (null != mOutputStream) {
-                try {
-                    mOutputStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+            IoUtils.closeFileStream(mOutputStream);
             mOutputStream = null;
         }
         if (null != mReadThread) {
             mReadThread.interrupt();
             mReadThread = null;
+        }
+        if (null != startIntent) {
+            mContext.stopService(startIntent);
         }
     }
 
@@ -112,15 +92,16 @@ public class SerialportApplication extends Application {
     }
 
     public static void initSerialPort() {
-        //启动发送数据的服务
-        mStartIntent = new Intent(mContext, SendService.class);
-        mContext.startService(mStartIntent);
         try {
+            //启动发送数据的服务
+            startIntent = new Intent(mContext, SendService.class);
+            mContext.startService(startIntent);
             SerialPort serialPort = getSerialPort();
             mInputStream = serialPort.getInputStream();
             mOutputStream = serialPort.getOutputStream();
-            mReadThread = new ReadThread();
-            mReadThread.start();
+            if (mReadThread == null)
+                mReadThread = new ReadSerialportThread();
+            ThreadPoolProxyFactory.getmThreadPoolProxy().submit(mReadThread);
         } catch (SecurityException e) {
             Toast.makeText(mContext, "没有串口权限", Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
